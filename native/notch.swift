@@ -7,6 +7,8 @@ final class SubtitleView: NSView {
     var progress: CGFloat = 0
     var attachedToNotch = false
     let subtitleHeight: CGFloat = 38
+    let transitionHeight: CGFloat = 22
+    var connectionWidth: CGFloat = 180
     let attributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 15, weight: .medium),
         .foregroundColor: NSColor.white
@@ -14,12 +16,19 @@ final class SubtitleView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.setFill()
         if attachedToNotch {
-            // Extend behind the physical camera housing all the way to the
-            // screen edge. Only the bottom corners round off: no capsule seam.
-            let radius: CGFloat = 18
+            // The panel starts at the housing's bottom edge. Above the
+            // subtitle only a narrow neck is painted; the shoulders stay clear.
+            // Smooth diagonal shoulders widen downwards into the subtitle body.
+            let radius: CGFloat = 16
+            let neckLeft = (bounds.width - connectionWidth) / 2
+            let neckRight = bounds.width - neckLeft
+            let shoulderY = subtitleHeight
             let shape = NSBezierPath()
-            shape.move(to: NSPoint(x: 0, y: bounds.maxY))
-            shape.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY))
+            shape.move(to: NSPoint(x: neckLeft, y: bounds.maxY))
+            shape.line(to: NSPoint(x: neckRight, y: bounds.maxY))
+            shape.curve(to: NSPoint(x: bounds.maxX, y: shoulderY - 4),
+                        controlPoint1: NSPoint(x: neckRight, y: bounds.maxY - 10),
+                        controlPoint2: NSPoint(x: bounds.maxX, y: shoulderY + 10))
             shape.line(to: NSPoint(x: bounds.maxX, y: radius))
             shape.curve(to: NSPoint(x: bounds.maxX - radius, y: 0),
                         controlPoint1: NSPoint(x: bounds.maxX, y: radius * 0.448),
@@ -28,6 +37,10 @@ final class SubtitleView: NSView {
             shape.curve(to: NSPoint(x: 0, y: radius),
                         controlPoint1: NSPoint(x: radius * 0.448, y: 0),
                         controlPoint2: NSPoint(x: 0, y: radius * 0.448))
+            shape.line(to: NSPoint(x: 0, y: shoulderY - 4))
+            shape.curve(to: NSPoint(x: neckLeft, y: bounds.maxY),
+                        controlPoint1: NSPoint(x: 0, y: shoulderY + 10),
+                        controlPoint2: NSPoint(x: neckLeft, y: bounds.maxY - 10))
             shape.close()
             shape.fill()
         } else {
@@ -81,9 +94,13 @@ final class SubtitleController {
             let notchWidth = (left != nil && right != nil)
                 ? max(0, right!.minX - left!.maxX) : 200
             let width = min(max(340, notchWidth + 96), screen.frame.width - 32)
-            let height = inset + view.subtitleHeight
+            // A tiny overlap joins the black housing without painting either
+            // menu-bar shoulder. Inset the neck to meet its rounded lower edge.
+            view.connectionWidth = min(width - 32, max(100, notchWidth - 20))
+            let height = view.transitionHeight + view.subtitleHeight
+            let top = screen.frame.maxY - inset + 2
             panel.setFrame(NSRect(x: screen.frame.midX - width / 2,
-                                  y: screen.frame.maxY - height,
+                                  y: top - height,
                                   width: width, height: height), display: true)
         } else {
             let width = min(CGFloat(400), screen.frame.width - 32)
