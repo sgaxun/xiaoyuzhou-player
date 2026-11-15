@@ -87,11 +87,12 @@ function SubtitleDisplaySelector(){
  return h('div',{className:'xyz-subtitle-screen'},
   saveError||loadError||preferenceError?h('div',{className:'xyz-setting-desc',role:'alert'},[saveError,loadError,preferenceError].filter(Boolean).join('；')):null,
   h('select',{className:'xyz-btn','aria-label':'字幕屏幕',title:'字幕显示屏',value:selection.id,disabled:busy,onChange:change},
-   h('option',{value:'auto'},'自动选择（优先刘海屏）'),
+   h('option',{value:'auto'},isWindowsSubtitlePlatform()?'自动选择（主显示器）':'自动选择（优先刘海屏）'),
    disconnected?h('option',{value:selection.id,disabled:true},`${selection.name||selection.id}（未连接，暂用其他屏幕）`):null,
    ...screens.map(screen=>{
     const duplicate=screens.filter(other=>other.name===screen.name).length>1;
-    return h('option',{key:screen.id,value:screen.id},`${screen.name}（${screen.builtIn?'内置':'外接'}${duplicate?`，${screen.width}×${screen.height}`:''}）`);
+    const kind=isWindowsSubtitlePlatform()?(screen.primary?'主显示器':'显示器'):(screen.builtIn?'内置':'外接');
+    return h('option',{key:screen.id,value:screen.id},`${screen.name}（${kind}${duplicate?`，${screen.width}×${screen.height}`:''}）`);
    })));
 }
 export function MenubarTranscriptSettings(){
@@ -109,13 +110,13 @@ export function MenubarTranscriptSettings(){
  const windows=isWindowsSubtitlePlatform();
  return h('div',{className:'xyz-subtitle-settings'},
   h('div',{className:'xyz-setting-row'},h('div',{className:'xyz-setting-label'},
-   h('div',{className:'xyz-setting-name'},windows?'桌面底部显示字幕':'滚动字幕'),
+   h('div',{className:'xyz-setting-name'},windows?'屏幕顶部字幕':'滚动字幕'),
    h('div',{className:'xyz-setting-desc'},'随播放进度滚动，暂停和跳转同步')),
    h('button',{type:'button',className:'xyz-btn','aria-pressed':enabled,onClick:toggleEnabled},enabled?'已开启':'已关闭')),
-  !windows?h('div',{className:'xyz-subtitle-options'},
-   h('select',{className:'xyz-btn','aria-label':'字幕位置',title:'字幕显示方式',value:mode,disabled:busy,onChange:changeMode},
-    h('option',{value:'notch'},'屏幕顶部字幕'),h('option',{value:'menubar'},'菜单栏字幕')),
-   mode!=='menubar'?h(SubtitleDisplaySelector):null):null,
+  h('div',{className:'xyz-subtitle-options'},
+   !windows?h('select',{className:'xyz-btn','aria-label':'字幕位置',title:'字幕显示方式',value:mode,disabled:busy,onChange:changeMode},
+    h('option',{value:'notch'},'屏幕顶部字幕'),h('option',{value:'menubar'},'菜单栏字幕')):null,
+   windows||mode!=='menubar'?h(SubtitleDisplaySelector):null),
   error?h('div',{className:'xyz-setting-desc',role:'alert'},error):null);
 
 }

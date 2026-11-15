@@ -25,8 +25,8 @@ func TestSubtitleStripWorkArea(t *testing.T) {
 		if bounds.Width != min(subtitleWidth, area.Width) || bounds.Height != min(subtitleHeight, area.Height) {
 			t.Fatal("unexpected strip size", bounds)
 		}
-		if area.Height >= subtitleHeight+12 && bounds.Y+bounds.Height != area.Y+area.Height-12 {
-			t.Fatal("incorrect bottom inset", bounds)
+		if area.Height >= subtitleHeight+12 && bounds.Y != area.Y+12 {
+			t.Fatal("incorrect top inset", bounds)
 		}
 	}
 }
@@ -66,5 +66,37 @@ func TestSubtitlePlatformRaster(t *testing.T) {
 				t.Fatal("macOS font on Windows", path)
 			}
 		}
+	}
+}
+
+func TestSubtitleMonitorSelectionAndFallback(t *testing.T) {
+	primary := mygo.Rectangle{X: 0, Y: 40, Width: 1920, Height: 1040}
+	external := mygo.Rectangle{X: -1600, Y: -300, Width: 1600, Height: 900}
+	monitors := []subtitleMonitor{
+		{SubtitleDisplay: SubtitleDisplay{ID: "external"}, WorkArea: external},
+		{SubtitleDisplay: SubtitleDisplay{ID: "primary", Primary: true}, WorkArea: primary},
+	}
+	for _, id := range []string{"", "auto", "disconnected"} {
+		got, ok := selectedSubtitleWorkArea(monitors, id)
+		if !ok || got != primary {
+			t.Fatalf("%s: %+v", id, got)
+		}
+	}
+	got, ok := selectedSubtitleWorkArea(monitors, "external")
+	if !ok || got != external {
+		t.Fatal(got, ok)
+	}
+	// Enumerating in a different order must not alter an explicit selection.
+	monitors[0], monitors[1] = monitors[1], monitors[0]
+	got, ok = selectedSubtitleWorkArea(monitors, "external")
+	if !ok || got != external {
+		t.Fatal(got, ok)
+	}
+	got, ok = selectedSubtitleWorkArea(monitors[:1], "external")
+	if !ok || got != primary {
+		t.Fatal("disconnect fallback", got, ok)
+	}
+	if _, ok := selectedSubtitleWorkArea(nil, "auto"); ok {
+		t.Fatal("accepted empty topology")
 	}
 }

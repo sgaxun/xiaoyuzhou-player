@@ -4,12 +4,12 @@ import React from 'react';
 import {act,create} from 'react-test-renderer';
 import {MenubarTranscriptSettings} from './menubar-transcript.js';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
-async function harness(t,{preference={enabled:false,mode:'notch',displayId:'auto'},screens=[]}={}){
+async function harness(t,{preference={enabled:false,mode:'notch',displayId:'auto'},screens=[],platform='MacIntel'}={}){
  const saved=new Map(['window','localStorage','navigator'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  const timers=new Map(),calls=[];let next=0,root,displayResult=screens,saveResult=null;
  const win=new EventTarget();
  win.mygo={call:async(method,...args)=>{calls.push([method,...args]);if(method==='Backend.SubtitlePreference')return preference;if(method==='Backend.SubtitleDisplays')return displayResult;if(method==='Backend.SaveSubtitleDisplay')return saveResult}};
- Object.defineProperty(globalThis,'navigator',{configurable:true,value:{platform:'MacIntel'}});
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{platform}});
  globalThis.window=win;globalThis.localStorage={getItem:()=>null,setItem(){}};
  t.mock.method(globalThis,'setTimeout',(fn,delay)=>{assert.equal(delay,3000);timers.set(++next,fn);return next});
  t.mock.method(globalThis,'clearTimeout',id=>timers.delete(id));
@@ -45,4 +45,14 @@ test('polls serially, keeps choice on errors and stops when selector unmounts',a
  assert.equal(f.select().props.value,'b');assert.match(f.root.root.findByProps({role:'alert'}).children.join(''),/列表读取失败/);
  await act(async()=>f.root.root.findByProps({'aria-label':'字幕位置'}).props.onChange({target:{value:'menubar'}}));
  assert.equal(f.timers.size,0);assert.equal(f.root.root.findAllByProps({'aria-label':'字幕屏幕'}).length,0);
+});
+
+test('Windows offers persistent monitor selection without Mac subtitle modes',async t=>{
+ const f=await harness(t,{platform:'Win32',preference:{mode:'menubar',displayId:'b'},screens:[{id:'a',name:'Panel',primary:true},{id:'b',name:'External'}]});
+ assert.equal(f.root.root.findAllByProps({'aria-label':'字幕位置'}).length,0);
+ assert.equal(f.select().props.value,'b');
+ const labels=f.select().findAllByType('option').map(o=>o.children[0]);
+ assert.deepEqual(labels,['自动选择（主显示器）','Panel（主显示器）','External（显示器）']);
+ await f.change('a');
+ assert.ok(f.calls.some(c=>c[0]==='Backend.SaveSubtitleDisplay'&&c[1]==='a'));
 });

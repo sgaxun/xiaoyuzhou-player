@@ -82,6 +82,7 @@ type SubtitleDisplay struct {
 	BuiltIn bool   `json:"builtIn"`
 	Width   int    `json:"width"`
 	Height  int    `json:"height"`
+	Primary bool   `json:"primary,omitempty"`
 }
 
 func (b *Backend) SubtitleDisplays() ([]SubtitleDisplay, error) {

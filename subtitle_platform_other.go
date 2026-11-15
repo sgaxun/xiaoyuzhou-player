@@ -2,8 +2,9 @@
 
 package main
 
-// Only Windows uses the separate desktop subtitle strip. macOS keeps its
-// existing menu icon renderer in MenuSubtitle.
+// Platforms without a native subtitle implementation leave the overlay hidden.
 func (b *Backend) platformSubtitle(text string, progress float64) error { return nil }
 
 func (b *Backend) verifyPlatformSubtitle() error { return nil }
+
+func platformSubtitleDisplays() ([]SubtitleDisplay, error) { return []SubtitleDisplay{}, nil }

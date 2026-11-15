@@ -15,15 +15,18 @@ import (
 
 // One subtitle strip belongs to the application's single Backend. Its lock also
 // serializes the initial asynchronous page load with incoming audio-clock ticks.
+var watchWindowsSubtitleDisplays sync.Once
+
 var desktopSubtitle struct {
 	sync.Mutex
-	win      *mygo.Window
-	renderer subtitleRenderer
-	ready    bool
-	text     string
-	offset   int
-	frame    string
-	sent     string
+	win       *mygo.Window
+	renderer  subtitleRenderer
+	ready     bool
+	text      string
+	offset    int
+	frame     string
+	sent      string
+	displayID string
 }
 
 // platformSubtitle never changes the tray icon. The same bounded raster and
@@ -32,6 +35,7 @@ func (b *Backend) platformSubtitle(text string, progress float64) error {
 	s := &desktopSubtitle
 	s.Lock()
 	defer s.Unlock()
+	s.displayID = b.subtitleDisplay
 	text = normalizeSubtitle(text)
 	if text == "" {
 		s.text, s.frame, s.sent = "", "", ""
@@ -66,6 +70,18 @@ func (b *Backend) platformSubtitle(text string, progress float64) error {
 			s.win = nil
 			return err
 		}
+		watchWindowsSubtitleDisplays.Do(func() {
+			mygo.Screen.OnDisplaysChanged(func() {
+				// Screen queries and Page.Eval dispatch to the UI thread.
+				go func() {
+					s.Lock()
+					defer s.Unlock()
+					if s.win != nil && !s.win.IsDestroyed() {
+						_ = flushDesktopSubtitle()
+					}
+				}()
+			})
+		})
 		s.win.SetIgnoreMouseEvents(true)
 		win := s.win
 		win.Page().OnDidFinishLoad(func() {
@@ -100,7 +116,14 @@ func flushDesktopSubtitle() error {
 		}
 		s.sent = s.frame
 	}
-	area := mygo.Screen.PrimaryDisplay().WorkArea
+	monitors, err := windowsSubtitleMonitors()
+	if err != nil {
+		return err
+	}
+	area, ok := selectedSubtitleWorkArea(monitors, s.displayID)
+	if !ok {
+		return fmt.Errorf("字幕显示区域不可用")
+	}
 	bounds := subtitleStripBounds(area)
 	if bounds.Width <= 0 || bounds.Height <= 0 {
 		return fmt.Errorf("字幕显示区域不可用")

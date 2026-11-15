@@ -56,3 +56,5 @@ Windows 安装包默认安装到 `C:\Program Files\XiaoyuzhouPlayer`（系统 Pr
 刘海字幕原生检查：先构建助手（`npm run package`），再运行 `XIAOYUZHOU_TEST_NOTCH=1 go test -run 'TestNotchNativeLifecycle|TestNotchNativeDisplaySelection' -v .`。会短暂显示测试字幕，验证进度、清空隐藏和重启；不加载账号或播放真实节目。
 
 显示屏选择使用 CoreGraphics 显示屏 UUID 保存，不保存屏幕数组序号；设置页每 3 秒刷新当前屏幕列表，原生层通过屏幕配置变化通知处理断开回退和重连恢复。原生显示屏测试会依次把测试字幕放到当前每块屏幕上，并模拟缺失的目标 ID；物理拔插、合盖和全屏切换需手动验收。
+
+Windows 顶部字幕通过 MyGo 获取各显示器的 DIP 工作区，通过 EnumDisplayDevicesW 的显示器接口路径保存屏幕选择；虚拟或远程显示器没有接口路径时回退设备名称。显示器变化事件在后台刷新字幕位置，自动模式使用主显示器。可在 Mac 上用 `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c -o /tmp/xiaoyuzhou-windows.test.exe .` 检查 Windows 代码编译，但这不替代 Windows 本机安装包构建和运行验收。
