@@ -216,6 +216,12 @@ const playerRef = {current:null}; const listeners=new Set(); const mountedRef={c
     .xyz-account-name{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .xyz-account-sub{font-size:11px;opacity:.55}
     .xyz-setting-row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+    .xyz-subtitle-settings{display:flex;flex-direction:column;gap:8px;min-width:0}
+    .xyz-subtitle-options{display:flex;align-items:flex-start;gap:8px;min-width:0}
+    .xyz-subtitle-options>select{flex:0 1 120px;min-width:0}
+    .xyz-subtitle-screen{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:4px}
+    .xyz-subtitle-screen select{width:100%;min-width:0;text-overflow:ellipsis}
+    .xyz-subtitle-options select{background:color-mix(in srgb, var(--dsw-alias-label-primary,#888) 7%, transparent);border:1px solid color-mix(in srgb, var(--dsw-alias-label-primary,#888) 10%, transparent)}
     .xyz-setting-label{min-width:0;display:flex;flex-direction:column;gap:2px}
     .xyz-setting-name{font-size:12px}
     .xyz-setting-desc{font-size:11px;opacity:.5}

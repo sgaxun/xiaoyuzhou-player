@@ -84,10 +84,9 @@ function SubtitleDisplaySelector(){
   }finally{saving.current=false;if(alive.current)setBusy(false)}
  };
  const disconnected=selection.id!=='auto'&&!screens.some(screen=>screen.id===selection.id);
- return h('div',{className:'xyz-setting-row'},
-  h('div',{className:'xyz-setting-label'},h('div',{className:'xyz-setting-name'},'字幕屏幕'),
-   saveError||loadError||preferenceError?h('div',{className:'xyz-setting-desc',role:'alert'},[saveError,loadError,preferenceError].filter(Boolean).join('；')):null),
-  h('select',{className:'xyz-btn','aria-label':'字幕屏幕',style:{maxWidth:'72%',minWidth:0,textOverflow:'ellipsis'},value:selection.id,disabled:busy,onChange:change},
+ return h('div',{className:'xyz-subtitle-screen'},
+  saveError||loadError||preferenceError?h('div',{className:'xyz-setting-desc',role:'alert'},[saveError,loadError,preferenceError].filter(Boolean).join('；')):null,
+  h('select',{className:'xyz-btn','aria-label':'字幕屏幕',title:'字幕显示屏',value:selection.id,disabled:busy,onChange:change},
    h('option',{value:'auto'},'自动选择（优先刘海屏）'),
    disconnected?h('option',{value:selection.id,disabled:true},`${selection.name||selection.id}（未连接，暂用其他屏幕）`):null,
    ...screens.map(screen=>{
@@ -107,16 +106,18 @@ export function MenubarTranscriptSettings(){
   catch{setError('字幕位置切换失败，请重试')}
   finally{setBusy(false)}
  };
- return h(React.Fragment,null,h('div',{className:'xyz-setting-row'},h('div',{className:'xyz-setting-label'},
-  h('div',{className:'xyz-setting-name'},isWindowsSubtitlePlatform()?'桌面底部显示字幕':'显示滚动字幕'),
-  h('div',{className:'xyz-setting-desc'},isWindowsSubtitlePlatform()?'底部置顶字幕条，随播放进度滚动，不影响当前窗口':'随播放进度滚动，暂停停住，快进回退同步')),
-  h('button',{type:'button',className:'xyz-btn','aria-pressed':enabled,onClick:toggleEnabled},enabled?'已开启':'已关闭')),
-  !isWindowsSubtitlePlatform()?h('div',{className:'xyz-setting-row'},
-   h('div',{className:'xyz-setting-label'},h('div',{className:'xyz-setting-name'},'字幕位置'),
-    h('div',{className:'xyz-setting-desc'},error||'刘海下方显示；无刘海屏幕显示在顶部中央')),
-   h('select',{className:'xyz-btn','aria-label':'字幕位置',value:mode,disabled:busy,onChange:changeMode},
-    h('option',{value:'notch'},'屏幕顶部字幕'),h('option',{value:'menubar'},'菜单栏字幕'))):null,
-  !isWindowsSubtitlePlatform()&&mode!=='menubar'?h(SubtitleDisplaySelector):null);
+ const windows=isWindowsSubtitlePlatform();
+ return h('div',{className:'xyz-subtitle-settings'},
+  h('div',{className:'xyz-setting-row'},h('div',{className:'xyz-setting-label'},
+   h('div',{className:'xyz-setting-name'},windows?'桌面底部显示字幕':'滚动字幕'),
+   h('div',{className:'xyz-setting-desc'},'随播放进度滚动，暂停和跳转同步')),
+   h('button',{type:'button',className:'xyz-btn','aria-pressed':enabled,onClick:toggleEnabled},enabled?'已开启':'已关闭')),
+  !windows?h('div',{className:'xyz-subtitle-options'},
+   h('select',{className:'xyz-btn','aria-label':'字幕位置',title:'字幕显示方式',value:mode,disabled:busy,onChange:changeMode},
+    h('option',{value:'notch'},'屏幕顶部字幕'),h('option',{value:'menubar'},'菜单栏字幕')),
+   mode!=='menubar'?h(SubtitleDisplaySelector):null):null,
+  error?h('div',{className:'xyz-setting-desc',role:'alert'},error):null);
+
 }
 export {scrollingSubtitle} from './menubar-transcript-scheduler.js';
 export function MenubarTranscript({player,call}){
