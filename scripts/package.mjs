@@ -20,6 +20,9 @@ run(process.execPath,[process.env.npm_execpath||(()=>{throw Error('Run through n
 // Build from a clean staging directory.
 await rm(join(root,'resources/bin'),{recursive:true,force:true});
 if(process.platform==='darwin'){
+ await mkdir(join(root,'resources/bin'),{recursive:true});
+ run('xcrun',['swiftc','-O','-target','arm64-apple-macosx12.0','native/notch.swift','-o',join(root,'resources/bin/notch-helper')]);
+ run('codesign',['--force','--sign','-',join(root,'resources/bin/notch-helper')]);
  const shareApp=join(root,'resources/bin/小宇宙分享助手.app');
  await mkdir(join(shareApp,'Contents/MacOS'),{recursive:true});
  await writeFile(join(shareApp,'Contents/Info.plist'),`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>dev.sgaxun.xiaoyuzhou-player.share</string><key>CFBundleName</key><string>小宇宙分享助手</string><key>CFBundleExecutable</key><string>share-helper</string><key>CFBundlePackageType</key><string>APPL</string><key>LSUIElement</key><true/><key>LSMinimumSystemVersion</key><string>12.0</string></dict></plist>`);

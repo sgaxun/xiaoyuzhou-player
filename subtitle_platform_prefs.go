@@ -23,7 +23,39 @@ func (b *Backend) SubtitlePreference() (map[string]any, error) {
 	if value, ok := state["menubarTranscript"].(bool); ok {
 		enabled = value
 	}
-	return map[string]any{"enabled": enabled}, nil
+	mode, _ := state["subtitleMode"].(string)
+	if mode != "menubar" {
+		mode = "notch"
+	}
+	return map[string]any{"enabled": enabled, "mode": mode}, nil
+}
+
+func (b *Backend) SaveSubtitleMode(mode string) error {
+	if mode != "notch" && mode != "menubar" {
+		return fmt.Errorf("不支持的字幕位置")
+	}
+	b.mediaMu.Lock()
+	defer b.mediaMu.Unlock()
+	result, err := b.service.Request("savePrefs", map[string]any{"subtitleMode": mode})
+	if err != nil {
+		return err
+	}
+	if response, ok := result.(map[string]any); !ok || response["ok"] != true {
+		return fmt.Errorf("保存字幕位置失败")
+	}
+	if err := b.platformSubtitle("", 0); err != nil {
+		return err
+	}
+	if b.tray != nil {
+		if err := b.subtitleRenderer.update("", 0, &b.subtitle, &b.subtitleOffset, func(raw []byte) error {
+			b.tray.SetTitle("")
+			return b.tray.SetIcon(raw, true)
+		}); err != nil {
+			return err
+		}
+	}
+	b.subtitleMode = mode
+	return b.renderSubtitle(b.subtitleText, b.subtitleProgress)
 }
 
 func (b *Backend) SaveSubtitlePreference(enabled bool) error {

@@ -37,6 +37,9 @@ type Backend struct {
 	subtitleOffset     int
 	subtitleRenderer   subtitleRenderer
 	subtitleToggle     *mygo.MenuItem
+	subtitleMode       string
+	subtitleText       string
+	subtitleProgress   float64
 	pinned             atomic.Bool
 	pinToggle          *mygo.MenuItem
 	title              string
@@ -96,7 +99,16 @@ func (b *Backend) MediaState(title, artist string, playing bool, position, durat
 func (b *Backend) MenuSubtitle(text string, progress float64) error {
 	b.mediaMu.Lock()
 	defer b.mediaMu.Unlock()
+	b.subtitleText, b.subtitleProgress = text, progress
+	return b.renderSubtitle(text, progress)
+}
+
+// Caller holds mediaMu, including when changing the display mode mid-sentence.
+func (b *Backend) renderSubtitle(text string, progress float64) error {
 	if runtime.GOOS == "windows" {
+		return b.platformSubtitle(text, progress)
+	}
+	if runtime.GOOS == "darwin" && b.subtitleMode != "menubar" {
 		return b.platformSubtitle(text, progress)
 	}
 	if b.tray == nil {
@@ -136,6 +148,9 @@ func (b *Backend) toggle() {
 
 func (b *Backend) ready() {
 	var err error
+	if prefs, err := b.SubtitlePreference(); err == nil {
+		b.subtitleMode, _ = prefs["mode"].(string)
+	}
 	b.tray, err = mygo.NewTray(mygo.TrayOptions{ID: "xiaoyuzhou-player", Icon: trayIcon(), IconIsTemplate: true, ToolTip: "小宇宙播放器 — 点击显示或隐藏播放器"})
 	if err != nil {
 		log.Fatal(err)
@@ -173,7 +188,7 @@ func (b *Backend) ready() {
 	})
 	b.win.Page().LoadHTML(page, "")
 	b.tray.OnClick(b.toggle)
-	b.subtitleToggle = &mygo.MenuItem{Label: "菜单栏显示字幕", Type: mygo.MenuItemCheckbox, Checked: false, Click: func(*mygo.MenuItem, *mygo.Window) {
+	b.subtitleToggle = &mygo.MenuItem{Label: "显示字幕", Type: mygo.MenuItemCheckbox, Checked: false, Click: func(*mygo.MenuItem, *mygo.Window) {
 		go b.win.Page().Eval("window.dispatchEvent(new Event('xyz-toggle-menubar-transcript'))")
 	}}
 	if runtime.GOOS == "windows" {
@@ -263,6 +278,7 @@ func main() {
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { b.quitting = true })
 	mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
+		closePlatformSubtitle()
 		cancelEpisodes()
 		b.updates.Close()
 		mygo.NowPlaying.Clear()

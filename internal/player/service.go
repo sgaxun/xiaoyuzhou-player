@@ -307,6 +307,9 @@ func (s *Service) dispatch(ctx context.Context, action string, q url.Values, bod
 		return object{"ok": true, "importedProgress": applied, "queue": next["queue"], "index": next["queueIndex"]}, nil
 	case "savePrefs":
 		next := clone(s.state)
+		if mode, valid := body["subtitleMode"].(string); valid && (mode == "notch" || mode == "menubar") {
+			next["subtitleMode"] = mode
+		}
 		if enabled, valid := body["menubarTranscript"].(bool); valid {
 			next["menubarTranscript"] = enabled
 		}

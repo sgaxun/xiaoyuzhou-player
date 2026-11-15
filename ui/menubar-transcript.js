@@ -22,7 +22,12 @@ function hydrateEnabled(){
  const key=preference+'-hydration';
  if(window[key])return;
  const revision=window[preference+'-revision']||0;
+ const modeRevision=window[preference+'-mode-revision']||0;
  window[key]=Promise.resolve().then(()=>window.mygo.call('Backend.SubtitlePreference')).then(result=>{
+  if((window[preference+'-mode-revision']||0)===modeRevision){
+   window[preference+'-mode']=result?.mode==='menubar'?'menubar':'notch';
+   window.dispatchEvent(new Event(preference));
+  }
   if((window[preference+'-revision']||0)!==revision)return;
   if(typeof result?.enabled==='boolean'){publishEnabled(result.enabled);return}
   if(result?.enabled===null){
@@ -42,10 +47,25 @@ export function isWindowsSubtitlePlatform(platform=globalThis.navigator){
 }
 export function MenubarTranscriptSettings(){
  const enabled=useEnabled();
- return h('div',{className:'xyz-setting-row'},h('div',{className:'xyz-setting-label'},
-  h('div',{className:'xyz-setting-name'},isWindowsSubtitlePlatform()?'桌面底部显示字幕':'菜单栏显示字幕'),
-  h('div',{className:'xyz-setting-desc'},isWindowsSubtitlePlatform()?'底部置顶字幕条，随播放进度滚动，不影响当前窗口':'固定宽度滚动显示，随播放进度前进和回退')),
-  h('button',{type:'button',className:'xyz-btn','aria-pressed':enabled,onClick:toggleEnabled},enabled?'已开启':'已关闭'));
+ const [mode,setMode]=useState(()=>window[preference+'-mode']||'notch');
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{const update=()=>setMode(window[preference+'-mode']||'notch');window.addEventListener(preference,update);return()=>window.removeEventListener(preference,update)},[]);
+ const changeMode=async event=>{
+  const next=event.target.value;setBusy(true);setError('');
+  window[preference+'-mode-revision']=(window[preference+'-mode-revision']||0)+1;
+  try{await window.mygo.call('Backend.SaveSubtitleMode',next);window[preference+'-mode']=next;setMode(next)}
+  catch{setError('字幕位置切换失败，请重试')}
+  finally{setBusy(false)}
+ };
+ return h(React.Fragment,null,h('div',{className:'xyz-setting-row'},h('div',{className:'xyz-setting-label'},
+  h('div',{className:'xyz-setting-name'},isWindowsSubtitlePlatform()?'桌面底部显示字幕':'显示滚动字幕'),
+  h('div',{className:'xyz-setting-desc'},isWindowsSubtitlePlatform()?'底部置顶字幕条，随播放进度滚动，不影响当前窗口':'随播放进度滚动，暂停停住，快进回退同步')),
+  h('button',{type:'button',className:'xyz-btn','aria-pressed':enabled,onClick:toggleEnabled},enabled?'已开启':'已关闭')),
+  !isWindowsSubtitlePlatform()?h('div',{className:'xyz-setting-row'},
+   h('div',{className:'xyz-setting-label'},h('div',{className:'xyz-setting-name'},'字幕位置'),
+    h('div',{className:'xyz-setting-desc'},error||'刘海下方显示；无刘海屏幕显示在顶部中央')),
+   h('select',{className:'xyz-btn','aria-label':'字幕位置',value:mode,disabled:busy,onChange:changeMode},
+    h('option',{value:'notch'},'刘海字幕'),h('option',{value:'menubar'},'菜单栏字幕'))):null);
 }
 export {scrollingSubtitle} from './menubar-transcript-scheduler.js';
 export function MenubarTranscript({player,call}){

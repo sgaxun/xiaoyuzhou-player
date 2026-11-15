@@ -20,6 +20,15 @@ func TestSubtitlePreferencePersistenceAndConcurrentPatches(t *testing.T) {
 	if err != nil || value["enabled"] != nil {
 		t.Fatal("legacy preference must be absent", value, err)
 	}
+	if value["mode"] != "notch" {
+		t.Fatal("default display should be notch", value)
+	}
+	if err := b.SaveSubtitleMode("menubar"); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SaveSubtitleMode("unsupported"); err == nil {
+		t.Fatal("invalid display mode accepted")
+	}
 	// Both partial patches use the same service lock, so neither drops the other.
 	var wg sync.WaitGroup
 	failures := make(chan error, 2)
@@ -45,6 +54,9 @@ func TestSubtitlePreferencePersistenceAndConcurrentPatches(t *testing.T) {
 	value, err = b.SubtitlePreference()
 	if err != nil || value["enabled"] != true {
 		t.Fatal("enabled not restored", value, err)
+	}
+	if value["mode"] != "menubar" {
+		t.Fatal("display mode not restored", value)
 	}
 	raw, err := reopened.Request("state", nil)
 	if err != nil {

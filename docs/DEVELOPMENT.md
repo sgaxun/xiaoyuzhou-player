@@ -18,7 +18,7 @@ npm run package
 
 `npm test` 编译界面，运行 Node 组件／字幕调度测试和 Go 测试；测试使用模拟音频、隔离的临时目录及模拟网络。需要额外覆盖并发访问时，可运行 `go test -race ./...`。
 
-`npm run package` 生成应用图标、编译界面和 macOS 原生分享助手、构建并临时签名 App，最后生成和校验 DMG。分享助手源文件位于 `native/share.swift`，使用 Xcode Command Line Tools 编译，产物不提交到仓库。
+`npm run package` 生成应用图标、编译界面和 macOS 原生分享与刘海字幕助手、构建并临时签名 App，最后生成和校验 DMG。助手源文件位于 `native/share.swift`、`native/notch.swift`，使用 Xcode Command Line Tools 编译，产物不提交到仓库。
 
 - App：`build/darwin-arm64/小宇宙播放器.app`
 - 安装包：`release/小宇宙播放器-<版本>-AppleSilicon.dmg`
@@ -52,3 +52,5 @@ MYGO_GO=/absolute/path/to/go npm run package
 构建产物、依赖目录和个人账号数据不提交到仓库。调试时可通过 `XIAOYUZHOU_MENUBAR_DATA_DIR` 指定独立数据目录，避免影响日常使用的数据。
 
 Windows 安装包默认安装到 `C:\Program Files\XiaoyuzhouPlayer`（系统 Program Files 位于其他盘时跟随系统），安装和卸载需要管理员权限。程序仍使用普通权限启动，账户与播放数据仍按用户保存在 AppData。普通权限下的更新检查不触发 UAC；用户点击安装更新时，由管理员辅助进程重新读取内置更新源、匹配版本并使用原有公钥校验归档，再写入 Program Files。旧 AppData 安装的记忆路径不会覆盖新默认位置；手动选择路径或 `/D=` 参数仍有效。
+
+刘海字幕原生检查：先构建助手（`npm run package`），再运行 `XIAOYUZHOU_TEST_NOTCH=1 go test -run TestNotchNativeLifecycle -v .`。会短暂显示测试字幕，验证进度、清空隐藏和重启；不加载账号或播放真实节目。
