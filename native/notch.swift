@@ -5,20 +5,42 @@ import AppKit
 final class SubtitleView: NSView {
     var text = ""
     var progress: CGFloat = 0
+    var attachedToNotch = false
+    let subtitleHeight: CGFloat = 38
     let attributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 15, weight: .medium),
         .foregroundColor: NSColor.white
     ]
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
-        let viewport = bounds.insetBy(dx: 20, dy: 0)
+        if attachedToNotch {
+            // Extend behind the physical camera housing all the way to the
+            // screen edge. Only the bottom corners round off: no capsule seam.
+            let radius: CGFloat = 18
+            let shape = NSBezierPath()
+            shape.move(to: NSPoint(x: 0, y: bounds.maxY))
+            shape.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY))
+            shape.line(to: NSPoint(x: bounds.maxX, y: radius))
+            shape.curve(to: NSPoint(x: bounds.maxX - radius, y: 0),
+                        controlPoint1: NSPoint(x: bounds.maxX, y: radius * 0.448),
+                        controlPoint2: NSPoint(x: bounds.maxX - radius * 0.448, y: 0))
+            shape.line(to: NSPoint(x: radius, y: 0))
+            shape.curve(to: NSPoint(x: 0, y: radius),
+                        controlPoint1: NSPoint(x: radius * 0.448, y: 0),
+                        controlPoint2: NSPoint(x: 0, y: radius * 0.448))
+            shape.close()
+            shape.fill()
+        } else {
+            NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
+        }
+        let textArea = NSRect(x: 0, y: 0, width: bounds.width, height: subtitleHeight)
+        let viewport = textArea.insetBy(dx: 20, dy: 0)
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: viewport).addClip()
         let size = (text as NSString).size(withAttributes: attributes)
         let offset = max(0, size.width - viewport.width) * progress
         (text as NSString).draw(at: NSPoint(x: viewport.minX - offset,
-                                          y: (bounds.height - size.height) / 2),
+                                          y: (subtitleHeight - size.height) / 2),
                                  withAttributes: attributes)
         NSGraphicsContext.restoreGraphicsState()
     }
@@ -49,12 +71,26 @@ final class SubtitleController {
         // the menu bar. Fall back to the main screen for desktops/external-only.
         guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
                 ?? NSScreen.main ?? NSScreen.screens.first else { return }
-        let width = min(CGFloat(520), screen.frame.width - 32)
-        let top = screen.safeAreaInsets.top > 0
-            ? screen.frame.maxY - screen.safeAreaInsets.top
-            : screen.visibleFrame.maxY
-        panel.setFrame(NSRect(x: screen.frame.midX - width / 2,
-                              y: top - 38, width: width, height: 38), display: true)
+        let inset = screen.safeAreaInsets.top
+        view.attachedToNotch = inset > 0
+        if inset > 0 {
+            // Derive the camera housing width from the two usable top regions.
+            // Keep the expanded island compact, with enough room for one line.
+            let left = screen.auxiliaryTopLeftArea
+            let right = screen.auxiliaryTopRightArea
+            let notchWidth = (left != nil && right != nil)
+                ? max(0, right!.minX - left!.maxX) : 200
+            let width = min(max(340, notchWidth + 96), screen.frame.width - 32)
+            let height = inset + view.subtitleHeight
+            panel.setFrame(NSRect(x: screen.frame.midX - width / 2,
+                                  y: screen.frame.maxY - height,
+                                  width: width, height: height), display: true)
+        } else {
+            let width = min(CGFloat(400), screen.frame.width - 32)
+            panel.setFrame(NSRect(x: screen.frame.midX - width / 2,
+                                  y: screen.visibleFrame.maxY - view.subtitleHeight,
+                                  width: width, height: view.subtitleHeight), display: true)
+        }
     }
     func update(_ message: [String: Any]) -> [String: Any] {
         view.text = message["text"] as? String ?? ""
