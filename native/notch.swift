@@ -6,29 +6,29 @@ final class SubtitleView: NSView {
     var text = ""
     var progress: CGFloat = 0
     var attachedToNotch = false
-    let subtitleHeight: CGFloat = 38
-    let transitionHeight: CGFloat = 22
+    let subtitleHeight: CGFloat = 32
+    let transitionHeight: CGFloat = 6
     var connectionWidth: CGFloat = 180
     let attributes: [NSAttributedString.Key: Any] = [
-        .font: NSFont.systemFont(ofSize: 15, weight: .medium),
+        .font: NSFont.systemFont(ofSize: 14, weight: .medium),
         .foregroundColor: NSColor.white
     ]
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.setFill()
         if attachedToNotch {
-            // The panel starts at the housing's bottom edge. Above the
-            // subtitle only a narrow neck is painted; the shoulders stay clear.
-            // Smooth diagonal shoulders widen downwards into the subtitle body.
-            let radius: CGFloat = 16
+            // Keep the transition shallow and straight. The two-pixel turns
+            // soften the diagonal without creating the old flared shoulders.
+            let radius: CGFloat = 11
             let neckLeft = (bounds.width - connectionWidth) / 2
             let neckRight = bounds.width - neckLeft
             let shoulderY = subtitleHeight
             let shape = NSBezierPath()
             shape.move(to: NSPoint(x: neckLeft, y: bounds.maxY))
             shape.line(to: NSPoint(x: neckRight, y: bounds.maxY))
-            shape.curve(to: NSPoint(x: bounds.maxX, y: shoulderY - 4),
-                        controlPoint1: NSPoint(x: neckRight, y: bounds.maxY - 10),
-                        controlPoint2: NSPoint(x: bounds.maxX, y: shoulderY + 10))
+            shape.line(to: NSPoint(x: bounds.maxX - 2, y: shoulderY + 1))
+            shape.curve(to: NSPoint(x: bounds.maxX, y: shoulderY - 1),
+                        controlPoint1: NSPoint(x: bounds.maxX, y: shoulderY + 0.5),
+                        controlPoint2: NSPoint(x: bounds.maxX, y: shoulderY))
             shape.line(to: NSPoint(x: bounds.maxX, y: radius))
             shape.curve(to: NSPoint(x: bounds.maxX - radius, y: 0),
                         controlPoint1: NSPoint(x: bounds.maxX, y: radius * 0.448),
@@ -37,17 +37,18 @@ final class SubtitleView: NSView {
             shape.curve(to: NSPoint(x: 0, y: radius),
                         controlPoint1: NSPoint(x: radius * 0.448, y: 0),
                         controlPoint2: NSPoint(x: 0, y: radius * 0.448))
-            shape.line(to: NSPoint(x: 0, y: shoulderY - 4))
-            shape.curve(to: NSPoint(x: neckLeft, y: bounds.maxY),
-                        controlPoint1: NSPoint(x: 0, y: shoulderY + 10),
-                        controlPoint2: NSPoint(x: neckLeft, y: bounds.maxY - 10))
+            shape.line(to: NSPoint(x: 0, y: shoulderY - 1))
+            shape.curve(to: NSPoint(x: 2, y: shoulderY + 1),
+                        controlPoint1: NSPoint(x: 0, y: shoulderY),
+                        controlPoint2: NSPoint(x: 0, y: shoulderY + 0.5))
+            shape.line(to: NSPoint(x: neckLeft, y: bounds.maxY))
             shape.close()
             shape.fill()
         } else {
             NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
         }
         let textArea = NSRect(x: 0, y: 0, width: bounds.width, height: subtitleHeight)
-        let viewport = textArea.insetBy(dx: 20, dy: 0)
+        let viewport = textArea.insetBy(dx: 16, dy: 0)
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: viewport).addClip()
         let size = (text as NSString).size(withAttributes: attributes)
@@ -93,7 +94,7 @@ final class SubtitleController {
             let right = screen.auxiliaryTopRightArea
             let notchWidth = (left != nil && right != nil)
                 ? max(0, right!.minX - left!.maxX) : 200
-            let width = min(max(340, notchWidth + 96), screen.frame.width - 32)
+            let width = min(max(260, notchWidth + 56), screen.frame.width - 32)
             // A tiny overlap joins the black housing without painting either
             // menu-bar shoulder. Inset the neck to meet its rounded lower edge.
             view.connectionWidth = min(width - 32, max(100, notchWidth - 20))
