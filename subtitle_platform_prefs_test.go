@@ -104,3 +104,41 @@ func TestSubtitlePreferenceReportsFailedSave(t *testing.T) {
 		t.Fatal("failed save committed in memory", value, err)
 	}
 }
+
+func TestSubtitleDisplayPreferencePersistence(t *testing.T) {
+	dir := t.TempDir()
+	service, err := player.New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &Backend{service: service}
+	prefs, err := b.SubtitlePreference()
+	if err != nil || prefs["displayId"] != "auto" {
+		t.Fatal(prefs, err)
+	}
+	// A previously selected screen must survive being absent at startup. The
+	// renderer handles temporary fallback, never overwriting the saved UUID.
+	_, err = service.Request("savePrefs", map[string]any{"subtitleDisplayId": "remembered-screen", "subtitleDisplayName": "External display"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SaveSubtitlePreference(true); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := player.New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.service = reopened
+	prefs, err = b.SubtitlePreference()
+	if err != nil || prefs["displayId"] != "remembered-screen" || prefs["displayName"] != "External display" || prefs["enabled"] != true {
+		t.Fatal(prefs, err)
+	}
+	if err := b.SaveSubtitleDisplay("auto"); err != nil {
+		t.Fatal(err)
+	}
+	prefs, err = b.SubtitlePreference()
+	if err != nil || prefs["displayId"] != "auto" || prefs["displayName"] != "" {
+		t.Fatal(prefs, err)
+	}
+}

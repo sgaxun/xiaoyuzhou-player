@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,6 +25,8 @@ var notchSubtitle struct {
 		Visible            bool    `json:"visible"`
 		IgnoresMouseEvents bool    `json:"ignoresMouseEvents"`
 		Progress           float64 `json:"progress"`
+		DisplayID          string  `json:"displayId"`
+		RequestedDisplayID string  `json:"requestedDisplayId"`
 	}
 }
 
@@ -57,13 +60,9 @@ func (b *Backend) platformSubtitle(text string, progress float64) error {
 	}
 	progress = max(0, min(1, progress))
 	if s.cmd == nil {
-		exe, err := os.Executable()
+		path, err := notchHelperPath()
 		if err != nil {
 			return err
-		}
-		path := filepath.Join(filepath.Dir(exe), "../Resources/bin/notch-helper")
-		if _, err := os.Stat(path); err != nil {
-			path = "resources/bin/notch-helper"
 		}
 		cmd := exec.Command(path)
 		input, err := cmd.StdinPipe()
@@ -92,7 +91,11 @@ func (b *Backend) platformSubtitle(text string, progress float64) error {
 			_ = cmd.Wait()
 		}()
 	}
-	raw, err := json.Marshal(map[string]any{"text": text, "progress": progress})
+	displayID := b.subtitleDisplay
+	if displayID == "" {
+		displayID = "auto"
+	}
+	raw, err := json.Marshal(map[string]any{"text": text, "progress": progress, "displayId": displayID})
 	if err == nil {
 		_, err = s.input.Write(append(raw, '\n'))
 	}
@@ -127,4 +130,34 @@ func (b *Backend) verifyPlatformSubtitle() error {
 		return fmt.Errorf("刘海字幕未显示或未启用鼠标穿透")
 	}
 	return nil
+}
+
+func notchHelperPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(filepath.Dir(exe), "../Resources/bin/notch-helper")
+	if _, err := os.Stat(path); err != nil {
+		path = "resources/bin/notch-helper"
+	}
+	return path, nil
+}
+
+func platformSubtitleDisplays() ([]SubtitleDisplay, error) {
+	path, err := notchHelperPath()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	raw, err := exec.CommandContext(ctx, path, "--screens").Output()
+	if err != nil {
+		return nil, fmt.Errorf("读取显示屏失败: %w", err)
+	}
+	var displays []SubtitleDisplay
+	if err := json.Unmarshal(raw, &displays); err != nil {
+		return nil, fmt.Errorf("读取显示屏信息失败: %w", err)
+	}
+	return displays, nil
 }

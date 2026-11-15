@@ -1,4 +1,26 @@
 import AppKit
+import CoreGraphics
+
+// UUID identifies the display across arrangement changes and reconnects;
+// NSScreen array indices and session display numbers are not saved.
+func displayIdentity(_ screen: NSScreen) -> String {
+    let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+    guard let number = number,
+          let uuid = CGDisplayCreateUUIDFromDisplayID(number.uint32Value)?.takeRetainedValue() else { return "" }
+    return CFUUIDCreateString(nil, uuid) as String
+}
+func displayList() -> [[String: Any]] {
+    return NSScreen.screens.compactMap { screen in
+        let id = displayIdentity(screen)
+        guard !id.isEmpty else { return nil }
+        let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        let displayID = number?.uint32Value ?? 0
+        return ["id": id, "name": screen.localizedName,
+                "builtIn": CGDisplayIsBuiltin(displayID) != 0,
+                "width": Int(CGDisplayPixelsWide(displayID)),
+                "height": Int(CGDisplayPixelsHigh(displayID))]
+    }
+}
 
 // A nonactivating panel owns no keyboard or mouse input. All AppKit work runs
 // on the main thread; newline-delimited updates arrive through the parent pipe.
@@ -63,6 +85,8 @@ final class SubtitleView: NSView {
 final class SubtitleController {
     let panel: NSPanel
     let view = SubtitleView()
+    var selectedDisplay = "auto"
+    var activeDisplay = ""
     init() {
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
@@ -78,13 +102,19 @@ final class SubtitleController {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             self?.layout()
+            self?.view.needsDisplay = true
+            if let self = self, !self.view.text.isEmpty { self.panel.orderFrontRegardless() }
         }
     }
     func layout() {
-        // Prefer the built-in camera screen, regardless of which monitor hosts
-        // the menu bar. Fall back to the main screen for desktops/external-only.
-        guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
-                ?? NSScreen.main ?? NSScreen.screens.first else { return }
+        // Honor the saved display UUID. If absent, temporarily use automatic
+        // selection without replacing it, so reconnecting restores the choice.
+        let screens = NSScreen.screens
+        let chosen = selectedDisplay == "auto" ? nil
+            : screens.first(where: { displayIdentity($0) == selectedDisplay })
+        guard let screen = chosen ?? screens.first(where: { $0.safeAreaInsets.top > 0 })
+                ?? screens.first else { return }
+        activeDisplay = displayIdentity(screen)
         let inset = screen.safeAreaInsets.top
         view.attachedToNotch = inset > 0
         if inset > 0 {
@@ -111,6 +141,7 @@ final class SubtitleController {
         }
     }
     func update(_ message: [String: Any]) -> [String: Any] {
+        if let display = message["displayId"] as? String { selectedDisplay = display }
         view.text = message["text"] as? String ?? ""
         let progress = message["progress"] as? Double ?? 0
         view.progress = CGFloat(progress.isFinite ? max(0, min(1, progress)) : 0)
@@ -124,12 +155,18 @@ final class SubtitleController {
         }
         return ["visible": panel.isVisible, "textLength": view.text.count,
                 "progress": view.progress, "ignoresMouseEvents": panel.ignoresMouseEvents,
-                "frame": NSStringFromRect(panel.frame)]
+                "frame": NSStringFromRect(panel.frame), "displayId": activeDisplay,
+                "requestedDisplayId": selectedDisplay]
     }
 }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+if CommandLine.arguments.contains("--screens") {
+    let data = try JSONSerialization.data(withJSONObject: displayList())
+    FileHandle.standardOutput.write(data)
+    exit(0)
+}
 let controller = SubtitleController()
 DispatchQueue.global(qos: .userInteractive).async {
     while let line = readLine() {

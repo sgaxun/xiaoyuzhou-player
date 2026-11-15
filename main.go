@@ -38,6 +38,7 @@ type Backend struct {
 	subtitleRenderer   subtitleRenderer
 	subtitleToggle     *mygo.MenuItem
 	subtitleMode       string
+	subtitleDisplay    string
 	subtitleText       string
 	subtitleProgress   float64
 	pinned             atomic.Bool
@@ -150,6 +151,7 @@ func (b *Backend) ready() {
 	var err error
 	if prefs, err := b.SubtitlePreference(); err == nil {
 		b.subtitleMode, _ = prefs["mode"].(string)
+		b.subtitleDisplay, _ = prefs["displayId"].(string)
 	}
 	b.tray, err = mygo.NewTray(mygo.TrayOptions{ID: "xiaoyuzhou-player", Icon: trayIcon(), IconIsTemplate: true, ToolTip: "小宇宙播放器 — 点击显示或隐藏播放器"})
 	if err != nil {

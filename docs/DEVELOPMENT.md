@@ -53,4 +53,6 @@ MYGO_GO=/absolute/path/to/go npm run package
 
 Windows 安装包默认安装到 `C:\Program Files\XiaoyuzhouPlayer`（系统 Program Files 位于其他盘时跟随系统），安装和卸载需要管理员权限。程序仍使用普通权限启动，账户与播放数据仍按用户保存在 AppData。普通权限下的更新检查不触发 UAC；用户点击安装更新时，由管理员辅助进程重新读取内置更新源、匹配版本并使用原有公钥校验归档，再写入 Program Files。旧 AppData 安装的记忆路径不会覆盖新默认位置；手动选择路径或 `/D=` 参数仍有效。
 
-刘海字幕原生检查：先构建助手（`npm run package`），再运行 `XIAOYUZHOU_TEST_NOTCH=1 go test -run TestNotchNativeLifecycle -v .`。会短暂显示测试字幕，验证进度、清空隐藏和重启；不加载账号或播放真实节目。
+刘海字幕原生检查：先构建助手（`npm run package`），再运行 `XIAOYUZHOU_TEST_NOTCH=1 go test -run 'TestNotchNativeLifecycle|TestNotchNativeDisplaySelection' -v .`。会短暂显示测试字幕，验证进度、清空隐藏和重启；不加载账号或播放真实节目。
+
+显示屏选择使用 CoreGraphics 显示屏 UUID 保存，不保存屏幕数组序号；设置页每 3 秒刷新当前屏幕列表，原生层通过屏幕配置变化通知处理断开回退和重连恢复。原生显示屏测试会依次把测试字幕放到当前每块屏幕上，并模拟缺失的目标 ID；物理拔插、合盖和全屏切换需手动验收。

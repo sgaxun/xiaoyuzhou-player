@@ -45,6 +45,56 @@ function useEnabled(){
 export function isWindowsSubtitlePlatform(platform=globalThis.navigator){
  return /windows|win32|win64/i.test(`${platform?.userAgent||''} ${platform?.platform||''}`);
 }
+function SubtitleDisplaySelector(){
+ const [selection,setSelection]=useState({id:'auto',name:''});
+ const [screens,setScreens]=useState([]);
+ const [busy,setBusy]=useState(false),[saveError,setSaveError]=useState(''),[loadError,setLoadError]=useState(''),[preferenceError,setPreferenceError]=useState('');
+ const revision=useRef(0),saving=useRef(false),alive=useRef(false);
+ useEffect(()=>{
+  alive.current=true;
+  let active=true,timer;
+  const initialRevision=revision.current;
+  Promise.resolve().then(()=>window.mygo.call('Backend.SubtitlePreference')).then(result=>{
+   if(active&&revision.current===initialRevision){
+    setSelection({id:result?.displayId||'auto',name:result?.displayName||''});
+   }
+  }).catch(()=>{if(active)setPreferenceError('字幕屏幕设置读取失败，请重新打开设置')});
+  const poll=async()=>{
+   try{
+    const result=await window.mygo.call('Backend.SubtitleDisplays');
+    if(!Array.isArray(result))throw new Error('Invalid displays');
+    if(active){setScreens(result);setLoadError('')}
+   }catch{if(active)setLoadError('屏幕列表读取失败，稍后重试')}
+   finally{if(active)timer=setTimeout(poll,3000)}
+  };
+  poll();
+  return()=>{active=false;alive.current=false;clearTimeout(timer)};
+ },[]);
+ const change=async event=>{
+  if(saving.current)return;
+  const id=event.target.value,previous=selection;
+  const next={id,name:screens.find(screen=>screen.id===id)?.name||''};
+  revision.current++;saving.current=true;setBusy(true);setSaveError('');setSelection(next);
+  try{
+   const result=await window.mygo.call('Backend.SaveSubtitleDisplay',id);
+   if(result!==null&&result!==undefined)throw new Error(String(result));
+   if(alive.current)setPreferenceError('');
+  }catch{
+   if(alive.current){setSelection(previous);setSaveError('字幕屏幕保存失败，已保留原来的选择，请重试')}
+  }finally{saving.current=false;if(alive.current)setBusy(false)}
+ };
+ const disconnected=selection.id!=='auto'&&!screens.some(screen=>screen.id===selection.id);
+ return h('div',{className:'xyz-setting-row'},
+  h('div',{className:'xyz-setting-label'},h('div',{className:'xyz-setting-name'},'字幕屏幕'),
+   saveError||loadError||preferenceError?h('div',{className:'xyz-setting-desc',role:'alert'},[saveError,loadError,preferenceError].filter(Boolean).join('；')):null),
+  h('select',{className:'xyz-btn','aria-label':'字幕屏幕',style:{maxWidth:'72%',minWidth:0,textOverflow:'ellipsis'},value:selection.id,disabled:busy,onChange:change},
+   h('option',{value:'auto'},'自动选择（优先刘海屏）'),
+   disconnected?h('option',{value:selection.id,disabled:true},`${selection.name||selection.id}（未连接，暂用其他屏幕）`):null,
+   ...screens.map(screen=>{
+    const duplicate=screens.filter(other=>other.name===screen.name).length>1;
+    return h('option',{key:screen.id,value:screen.id},`${screen.name}（${screen.builtIn?'内置':'外接'}${duplicate?`，${screen.width}×${screen.height}`:''}）`);
+   })));
+}
 export function MenubarTranscriptSettings(){
  const enabled=useEnabled();
  const [mode,setMode]=useState(()=>window[preference+'-mode']||'notch');
@@ -65,7 +115,8 @@ export function MenubarTranscriptSettings(){
    h('div',{className:'xyz-setting-label'},h('div',{className:'xyz-setting-name'},'字幕位置'),
     h('div',{className:'xyz-setting-desc'},error||'刘海下方显示；无刘海屏幕显示在顶部中央')),
    h('select',{className:'xyz-btn','aria-label':'字幕位置',value:mode,disabled:busy,onChange:changeMode},
-    h('option',{value:'notch'},'刘海字幕'),h('option',{value:'menubar'},'菜单栏字幕'))):null);
+    h('option',{value:'notch'},'屏幕顶部字幕'),h('option',{value:'menubar'},'菜单栏字幕'))):null,
+  !isWindowsSubtitlePlatform()&&mode!=='menubar'?h(SubtitleDisplaySelector):null);
 }
 export {scrollingSubtitle} from './menubar-transcript-scheduler.js';
 export function MenubarTranscript({player,call}){
